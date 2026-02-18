@@ -18,6 +18,7 @@ class Jokes:
             ("Invert mouse buttons", self.invert_mouse_buttons),
             ("send_fake_notifications", self.send_fake_notifications),
             ("Cursor size", self.cursor_size),
+            ("Random cursor size", self.random_cursor_size),
             ("Animations / primary paste", self.animations),
             ("Wallpaper", self.wallpaper),
             ("Cursor blink", self.cursor_blink),
@@ -67,6 +68,21 @@ class Jokes:
         )
         self.execute_remote(ip, cmd)
 
+    def random_cursor_size(self, ip: str, reset: bool = False) -> None:
+        import random
+        if reset:
+            reset_cmd_size: str = "gsettings reset org.gnome.desktop.interface cursor-size"
+            reset_cmd_time: str = "gsettings reset org.gnome.desktop.interface cursor-blink-time"
+            self.execute_remote(ip, reset_cmd_size)
+            self.execute_remote(ip, reset_cmd_time)
+        else:
+            size: int = random.randint(24, 256)
+            time_ms: int = 500
+            set_cmd_size: str = f"gsettings set org.gnome.desktop.interface cursor-size {size}"
+            set_cmd_time: str = f"gsettings set org.gnome.desktop.interface cursor-blink-time {time_ms}"
+            self.execute_remote(ip, set_cmd_size)
+            self.execute_remote(ip, set_cmd_time)
+
     def animations(self, ip: str, reset: bool = False) -> None:
         cmd: str = (
             "gsettings reset org.gnome.desktop.interface enable-animations"
@@ -81,6 +97,20 @@ class Jokes:
         )
         self.execute_remote(ip, cmd2)
 
+    # ****************************************************************************************************
+    #                   Wallpaper prank
+    # ****************************************************************************************************
+
+    def _validate_wallpaper_path(self) -> str:
+        while True:
+            wallpaper_path: str = input("Enter wallpaper path : ")
+            try:
+                with open(wallpaper_path, "r"):
+                    pass
+                return wallpaper_path
+            except Exception as e:
+                print(e)
+
     def wallpaper(self, ip: str, reset: bool = False, path: str | None = None) -> None:
         if reset:
             reset_cmds: list[str] = [
@@ -89,9 +119,9 @@ class Jokes:
             ]
             cmds = reset_cmds
         else:
-            path = path or "/home/USER/Pictures/troll.jpg"
+            wallpaper_path = path or "/home/USER/Pictures/troll.jpg"
             set_cmds: list[str] = [
-                f'gsettings set org.gnome.desktop.background picture-uri "file://{path}"'
+                f'gsettings set org.gnome.desktop.background picture-uri "file://{wallpaper_path}"'
             ]
             cmds = set_cmds
         for c in cmds:
@@ -143,16 +173,20 @@ class Jokes:
 
     def get_valid_prank_index(self) -> int:
         while True:
-            choice: int = int(input("Enter the number of the prank to run: "))
-            if choice is str or not (1 <= int(choice) <= len(self.menu)):
+            choice: str = input("Enter the number of the prank to run: ")
+            if not choice.isdigit():
+                print("Invalid choice. Please enter a number.")
+                continue
+            choice_int = int(choice)
+            if not (1 <= choice_int <= len(self.menu)):
                 print("Invalid choice")
-            else:
-                return choice - 1
+                continue
+            return choice_int - 1
 
     def print_pranks(self) -> None:
         print("Available pranks:")
         for i, name in enumerate(self.menu, 1):
-            print(f"{i}) {name}")
+            print(f"{i}) {name[0]}")
 
     # ****************************************************************************************************
     #                   Wallpaper class
@@ -162,15 +196,27 @@ class Jokes:
     # and also make every method as
     # class method cuz I dont need more
     # instance of wallpaper
-    class Wallpaper:
-        def __init__(self) -> None:
-            pass
-
-        def set(self):
-            pass
-
-        def reset(self):
-            pass
+    #
+    # class Wallpaper:
+    #     def __init__(self, ip: str) -> None:
+    #         self.ip: str = ip
+    #         self.wallpaper_path: str = ""
+    #
+    #     def _validate_wallpaper_path(self):
+    #         while True:
+    #             self.wallpaper_path = input("Enter wallpaper path : ")
+    #             try:
+    #                 with open(self.wallpaper_path, "r"):
+    #                     pass
+    #                 return
+    #             except Exception as e:
+    #                 print(e)
+    #
+    #     def set(self):
+    #         self._validate_wallpaper_path()
+    #
+    #     def reset(self):
+    #         pass
 
     # ****************************************************************************************************
     #                   Start of the program
@@ -190,7 +236,7 @@ class Jokes:
         prank_name, prank_func = self.menu[choice]
 
         reset: bool = False
-        if prank_name not in ["send_fake_notifications", "Speech"]:
+        if prank_name not in ["send_fake_notifications", "Speech", "Random cursor size"]:
             resp: str = (
                 input("Do you want to reset instead of apply? (y/N): ").strip().lower()
             )
@@ -198,10 +244,8 @@ class Jokes:
 
         if prank_name == "Wallpaper":
             if not reset:
-                path: str = input(
-                    "Enter wallpaper path (or leave empty for default): "
-                ).strip()
-                prank_func(ip, reset=reset, path=path or None)  # pyright: ignore[reportCallIssue]
+                wallpaper_path: str = self._validate_wallpaper_path()
+                prank_func(ip, reset=reset, path=wallpaper_path)  # pyright: ignore[reportCallIssue]
             else:
                 prank_func(ip, reset=reset)  # pyright: ignore[reportCallIssue]
         elif prank_name in ["send_fake_notifications", "Speech"]:
