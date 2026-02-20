@@ -44,7 +44,14 @@ class SSHScanner:
     def scan(self) -> str:
         network_ip: str = self._network_ip_validation()
         mask: str = self._network_mask_validation()
-        cmd = ["nmap", self.nmap_timing, "-p22", "-oG", "-", f"{network_ip}/{mask}"]
+        cmd: list[str] = [
+            "nmap",
+            self.nmap_timing,
+            "-p22",
+            "-oG",
+            "-",
+            f"{network_ip}/{mask}",
+        ]
         return subprocess.check_output(cmd, text=True)
 
     def parse_ips(self, scan_output: str) -> list[str]:
@@ -56,18 +63,18 @@ class SSHScanner:
         return ips
 
     def get_hostname(self, ip: str) -> str | None:
-        target = f"{self.user}@{ip}"
-        cmd = [
+        target: str = f"{self.user}@{ip}"
+        cmd: list[str] = [
             "ssh",
             "-o",
-            "BatchMode=yes",
+            "StrictHostKeyChecking=no",
             "-o",
-            f"ConnectTimeout={self.execute_remote_timeout}",
+            "UserKnownHostsFile=/dev/null",
             target,
             "hostname",
         ]
         try:
-            out = subprocess.check_output(
+            out: str = subprocess.check_output(
                 cmd,
                 stderr=subprocess.DEVNULL,
                 text=True,
@@ -78,20 +85,37 @@ class SSHScanner:
             print(e)
             return None
 
-    def get_mappping_ip_pc(self, ips: list[str]) -> dict[str, str]:
+    def is_hosts_file_exists(self) -> bool:
+        try:
+            with open("hosts", "r", encoding="utf-8"):
+                pass
+        except Exception as e:
+            print(e)
+            return False
+
+        return True
+
+    def get_hosts_from_file(self) -> None:
+        with open("hosts", "r", encoding="utf-8") as f:
+            pass
+
+    def get_mapping_pc_ip(self, ips: list[str]) -> dict[str, str]:
+        # if self.is_hosts_file_exists():
+        # self.get_hosts_from_file()
         mapping: dict[str, str] = {}
         for ip in ips:
             print(f"Checking {ip} ...", end=" ", flush=True)
-            name = self.get_hostname(ip)
+            name: str | None = self.get_hostname(ip)
             if name:
                 print(f"OK -> {name}")
-                mapping[ip] = name
+                mapping[name] = ip
             else:
                 print("no response / auth failed")
 
-        with open("hosts.txt", "w", encoding="utf-8") as f:
-            for ip, name in mapping.items():
-                f.write(f"{ip} {name}\n")
+        with open("hosts", "w", encoding="utf-8") as f:
+            for name, ip in mapping.items():
+                f.write(f"{name} {ip}\n")
+
         return mapping
 
     def run(self):
@@ -101,7 +125,10 @@ class SSHScanner:
         if not ips:
             print("No hosts with port 22 open found.")
             return
-        pc_to_ip_mapping = self.get_mappping_ip_pc(ips)
+
+        pc_to_ip_mapping.clear()
+        pc_to_ip_mapping.update(self.get_mapping_pc_ip(ips))
         print(f"\nDiscovered {len(pc_to_ip_mapping)} hosts.")
+
         for ip, name in pc_to_ip_mapping.items():
             print(f"{ip}\t{name}")

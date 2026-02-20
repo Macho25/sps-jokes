@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-from scanner import *
+from scanner import SSHScanner, pc_to_ip_mapping, validate_ipv4
+import subprocess
 
 
 class Jokes:
@@ -8,12 +9,11 @@ class Jokes:
     Each prank has apply() and reset() methods.
     """
 
-    def __init__(
-        self, user: str, display: str = ":0", dbus_path: str | None = None
-    ) -> None:
+    def __init__(self, user: str) -> None:
         self.user: str = user
-        self.display: str = display
-        self.dbus_path: str = dbus_path or "/run/user/1000/bus"
+        self.target_pc: str = ""
+        self.prank_index: int = 0
+
         self.menu = [
             ("Invert mouse buttons", self.invert_mouse_buttons),
             ("send_fake_notifications", self.send_fake_notifications),
@@ -35,9 +35,7 @@ class Jokes:
             print(f"Invalid IP address: {ip}. Please try again.")
 
     def execute_remote(self, ip: str, cmd: str) -> None:
-        """Run a command remotely with correct DISPLAY and DBUS"""
-        full_cmd: str = f"export DISPLAY={self.display}; export DBUS_SESSION_BUS_ADDRESS={self.dbus_path}; {cmd}"
-        subprocess.run(["ssh", f"{self.user}@{ip}", full_cmd])
+        subprocess.run(["ssh", f"{self.user}@{ip}", cmd])
 
     # ****************************************************************************************************
     #                   Invidual pranks
@@ -70,16 +68,25 @@ class Jokes:
 
     def random_cursor_size(self, ip: str, reset: bool = False) -> None:
         import random
+
         if reset:
-            reset_cmd_size: str = "gsettings reset org.gnome.desktop.interface cursor-size"
-            reset_cmd_time: str = "gsettings reset org.gnome.desktop.interface cursor-blink-time"
+            reset_cmd_size: str = (
+                "gsettings reset org.gnome.desktop.interface cursor-size"
+            )
+            reset_cmd_time: str = (
+                "gsettings reset org.gnome.desktop.interface cursor-blink-time"
+            )
             self.execute_remote(ip, reset_cmd_size)
             self.execute_remote(ip, reset_cmd_time)
         else:
             size: int = random.randint(24, 256)
             time_ms: int = 500
-            set_cmd_size: str = f"gsettings set org.gnome.desktop.interface cursor-size {size}"
-            set_cmd_time: str = f"gsettings set org.gnome.desktop.interface cursor-blink-time {time_ms}"
+            set_cmd_size: str = (
+                f"gsettings set org.gnome.desktop.interface cursor-size {size}"
+            )
+            set_cmd_time: str = (
+                f"gsettings set org.gnome.desktop.interface cursor-blink-time {time_ms}"
+            )
             self.execute_remote(ip, set_cmd_size)
             self.execute_remote(ip, set_cmd_time)
 
@@ -164,12 +171,12 @@ class Jokes:
     def speech(self, ip: str) -> None:
         self.execute_remote(ip, "spd-say 'Hello. I am inside the machine.'")
 
-    def get_pc(self) -> str:
+    def get_target_pc(self) -> None:
         global pc_to_ip_mapping
         while True:
-            pc: str = input("Write pc hostname : ")
-            if pc in pc_to_ip_mapping:
-                return pc
+            self.target_pc = input("Write pc hostname : ")
+            if self.target_pc in pc_to_ip_mapping:
+                return
 
     def get_valid_prank_index(self) -> int:
         while True:
@@ -187,6 +194,9 @@ class Jokes:
         print("Available pranks:")
         for i, name in enumerate(self.menu, 1):
             print(f"{i}) {name[0]}")
+
+    def get_prank(self) -> None:
+        self.prank_index = self.get_valid_prank_index()
 
     # ****************************************************************************************************
     #                   Wallpaper class
@@ -225,18 +235,17 @@ class Jokes:
         global pc_to_ip_mapping
         # TODO
         # refractor this function
-        self.print_pranks()
 
-        choice: int = self.get_valid_prank_index()
+        ip: str = pc_to_ip_mapping[self.target_pc]
 
-        target_pc: str = self.get_pc()
-
-        ip: str = pc_to_ip_mapping[target_pc]
-
-        prank_name, prank_func = self.menu[choice]
+        prank_name, prank_func = self.menu[self.prank_index]
 
         reset: bool = False
-        if prank_name not in ["send_fake_notifications", "Speech", "Random cursor size"]:
+        if prank_name not in [
+            "send_fake_notifications",
+            "Speech",
+            "Random cursor size",
+        ]:
             resp: str = (
                 input("Do you want to reset instead of apply? (y/N): ").strip().lower()
             )
@@ -259,4 +268,22 @@ class Jokes:
 scanner = SSHScanner(user="spravce", ssh_timeout=5)
 scanner.run()
 joke = Jokes("spravce")
-joke.run()
+
+
+def main():
+    user_cmd: str = input("> ")
+    if "list" in user_cmd:
+        joke.print_pranks()
+
+    elif "prank" in user_cmd:
+        joke.get_prank()
+
+    elif "target" in user_cmd:
+        joke.get_target_pc()
+
+    elif "run" in user_cmd:
+        joke.run()
+
+
+while True:
+    main()
