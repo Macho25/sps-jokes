@@ -1,8 +1,9 @@
 import subprocess
 import re
-
+import json
 
 pc_to_ip_mapping: dict[str, str] = {}
+HOSTS_FILE: str = "hosts.json"
 
 
 def validate_ipv4(ip: str) -> bool:
@@ -41,9 +42,11 @@ class SSHScanner:
                 f"Invalid CIDR prefix: {mask}. Must be between 0-32. Please try again."
             )
 
-    def scan(self) -> str:
-        network_ip: str = self._network_ip_validation()
-        mask: str = self._network_mask_validation()
+    def scan(self, network_ip: str | None = None, mask: str | None = None) -> str:
+        if not network_ip:
+            network_ip = self._network_ip_validation()
+        if not mask:
+            mask = self._network_mask_validation()
         cmd: list[str] = [
             "nmap",
             self.nmap_timing,
@@ -87,21 +90,26 @@ class SSHScanner:
 
     def is_hosts_file_exists(self) -> bool:
         try:
-            with open("hosts", "r", encoding="utf-8"):
+            with open(HOSTS_FILE, "r", encoding="utf-8"):
                 pass
-        except Exception as e:
-            print(e)
+            return True
+        except Exception:
             return False
 
-        return True
+    def get_hosts_from_file(self) -> dict[str, str]:
+        try:
+            with open(HOSTS_FILE, "r", encoding="utf-8") as f:
+                data: dict[str, str] = json.load(f)
+                return data
+        except Exception as e:
+            print(f"Error loading hosts file: {e}")
+            return {}
 
-    def get_hosts_from_file(self) -> None:
-        with open("hosts", "r", encoding="utf-8") as f:
-            pass
+    def save_hosts_to_file(self, mapping: dict[str, str]) -> None:
+        with open(HOSTS_FILE, "w", encoding="utf-8") as f:
+            json.dump(mapping, f, indent=4)
 
     def get_mapping_pc_ip(self, ips: list[str]) -> dict[str, str]:
-        # if self.is_hosts_file_exists():
-        # self.get_hosts_from_file()
         mapping: dict[str, str] = {}
         for ip in ips:
             print(f"Checking {ip} ...", end=" ", flush=True)
@@ -112,15 +120,36 @@ class SSHScanner:
             else:
                 print("no response / auth failed")
 
-        with open("hosts", "w", encoding="utf-8") as f:
-            for name, ip in mapping.items():
-                f.write(f"{name} {ip}\n")
-
+        self.save_hosts_to_file(mapping)
         return mapping
 
-    def run(self):
+    def print_hosts(self) -> None:
+        print(f"\nDiscovered {len(pc_to_ip_mapping)} hosts.")
+        for ip, name in pc_to_ip_mapping.items():
+            print(f"{ip}\t{name}")
+
+    def config(self):
+        pass
+
+    def load(self, force_scan: bool):
+        if not force_scan and self.is_hosts_file_exists():
+            print("Loading hosts from file...")
+            pc_to_ip_mapping.clear()
+            pc_to_ip_mapping.update(self.get_hosts_from_file())
+            self.print_hosts()
+            return
+
+    def run(self, force_scan: bool = False, network_ip: str | None = None, mask: str | None = None) -> None:
         global pc_to_ip_mapping
-        raw = self.scan()
+
+        if not force_scan and self.is_hosts_file_exists():
+            print("Loading hosts from file...")
+            pc_to_ip_mapping.clear()
+            pc_to_ip_mapping.update(self.get_hosts_from_file())
+            self.print_hosts()
+            return
+
+        raw = self.scan(network_ip, mask)
         ips = self.parse_ips(raw)
         if not ips:
             print("No hosts with port 22 open found.")
@@ -128,7 +157,4 @@ class SSHScanner:
 
         pc_to_ip_mapping.clear()
         pc_to_ip_mapping.update(self.get_mapping_pc_ip(ips))
-        print(f"\nDiscovered {len(pc_to_ip_mapping)} hosts.")
-
-        for ip, name in pc_to_ip_mapping.items():
-            print(f"{ip}\t{name}")
+        self.print_hosts()

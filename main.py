@@ -265,24 +265,58 @@ class Jokes:
         print(f"{prank_name} executed on {ip}.")
 
 
-scanner = SSHScanner(user="spravce", ssh_timeout=5)
-scanner.run()
 joke = Jokes("spravce")
+
+scanner = SSHScanner(user="spravce", ssh_timeout=5)
+scanner_config: dict[str, str] = {}
 
 
 def main():
     user_cmd: str = input("> ")
-    if "list" in user_cmd:
+
+    if "scan" in user_cmd:
+        sub_cmd: str = input("scan> ")
+
+        if "setup" in sub_cmd:
+            network_ip = scanner._network_ip_validation()
+            mask = scanner._network_mask_validation()
+            scanner_config["network_ip"] = network_ip
+            scanner_config["mask"] = mask
+            print(f"Config saved: {network_ip}/{mask}")
+
+        elif "load" in sub_cmd:
+            scanner.run(force_scan=False)
+
+        elif "run" in sub_cmd:
+            network_ip = scanner_config.get("network_ip")
+            mask = scanner_config.get("mask")
+            if network_ip and mask:
+                scanner.run(force_scan=True, network_ip=network_ip, mask=mask)
+            else:
+                print("No config found. Use 'scan setup' first.")
+
+        else:
+            print("Usage: scan [setup|load|run]")
+
+    elif "list" in user_cmd:
         joke.print_pranks()
 
     elif "prank" in user_cmd:
+        joke.print_pranks()
         joke.get_prank()
 
     elif "target" in user_cmd:
+        scanner.print_hosts()
         joke.get_target_pc()
 
     elif "run" in user_cmd:
         joke.run()
+    elif "help" in user_cmd:
+        print("Help: [scan|list|prank|target|run]")
+
+    else:
+        print("Invalid command")
+        return
 
 
 while True:
