@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from scanner import SSHScanner, pc_to_ip_mapping, validate_ipv4
-import subprocess
+from ssh_connection import SSHConnection
 
 
 class Jokes:
@@ -13,6 +13,7 @@ class Jokes:
         self.user: str = user
         self.target_pc: str = ""
         self.prank_index: int = 0
+        self.ssh_connection: SSHConnection = SSHConnection(user=user)
 
         self.menu = [
             ("Invert mouse buttons", self.invert_mouse_buttons),
@@ -35,7 +36,8 @@ class Jokes:
             print(f"Invalid IP address: {ip}. Please try again.")
 
     def execute_remote(self, ip: str, cmd: str) -> None:
-        subprocess.run(["ssh", f"{self.user}@{ip}", cmd])
+        self.ssh_connection.connect(ip)
+        self.ssh_connection.execute_quiet(cmd)
 
     # ****************************************************************************************************
     #                   Invidual pranks
