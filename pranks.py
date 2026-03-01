@@ -40,7 +40,15 @@ class Speech(Prank):
         self.language: str = "en"
         self.voice_type: str = ""
 
-        self.options: list[str] = []
+        # Default spd-say options for good sounding voice
+        self.options: list[str] = [
+            "-o espeak-ng",
+            "-r -10",
+            "-p 5",
+            "-R 10",
+            "-y Storm",
+            "-P important",
+        ]
 
         self.voice_types: list[str] = [
             "male1",
@@ -60,7 +68,15 @@ class Speech(Prank):
         self.volume = 0
         self.language = "en"
         self.voice_type = ""
-        self.options = []
+        # Default spd-say options for good sounding voice
+        self.options = [
+            "-o espeak-ng",
+            "-r -10",
+            "-p 5",
+            "-R 10",
+            "-y Storm",
+            "-P important",
+        ]
 
     @override
     def get_name(self) -> str:
