@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from scanner import SSHScanner, pc_to_ip_mapping, validate_ipv4
 from ssh_connection import SSHConnection
+from pranks import Speech
 
 
 class Jokes:
@@ -14,6 +15,7 @@ class Jokes:
         self.target_pc: str = ""
         self.prank_index: int = 0
         self.ssh_connection: SSHConnection = SSHConnection(user=user)
+        self.speech: Speech = Speech()
 
         self.menu = [
             ("Invert mouse buttons", self.invert_mouse_buttons),
@@ -37,7 +39,8 @@ class Jokes:
 
     def execute_remote(self, ip: str, cmd: str) -> None:
         self.ssh_connection.connect(ip)
-        self.ssh_connection.execute_quiet(cmd)
+        error = self.ssh_connection.execute(cmd)
+        print(error)
 
     # ****************************************************************************************************
     #                   Invidual pranks
@@ -121,20 +124,21 @@ class Jokes:
                 print(e)
 
     def wallpaper(self, ip: str, reset: bool = False, path: str | None = None) -> None:
+        self.ssh_connection.connect(ip)
+        
         if reset:
             reset_cmds: list[str] = [
                 "gsettings reset org.gnome.desktop.background picture-uri",
                 "gsettings reset org.gnome.desktop.background picture-uri-dark",
             ]
-            cmds = reset_cmds
+            for c in reset_cmds:
+                self.ssh_connection.execute_quiet(c)
         else:
             wallpaper_path = path or "/home/USER/Pictures/troll.jpg"
-            set_cmds: list[str] = [
-                f'gsettings set org.gnome.desktop.background picture-uri "file://{wallpaper_path}"'
-            ]
-            cmds = set_cmds
-        for c in cmds:
-            self.execute_remote(ip, c)
+            remote_path = "/tmp/wallpaper.jpg"
+            self.ssh_connection.scp(wallpaper_path, remote_path)
+            set_cmd = f'gsettings set org.gnome.desktop.background picture-uri "file://{remote_path}"'
+            self.ssh_connection.execute_quiet(set_cmd)
 
     def cursor_blink(self, ip: str, reset: bool = False) -> None:
         cmd: str = (
@@ -170,8 +174,8 @@ class Jokes:
         )
         self.execute_remote(ip, cmd)
 
-    def speech(self, ip: str) -> None:
-        self.execute_remote(ip, "spd-say 'Hello. I am inside the machine.'")
+    # def speech(self, ip: str) -> None:
+    #     self.execute_remote(ip, "spd-say 'Hello. I am inside the machine.'")
 
     def get_target_pc(self) -> None:
         global pc_to_ip_mapping
@@ -252,17 +256,22 @@ class Jokes:
                 input("Do you want to reset instead of apply? (y/N): ").strip().lower()
             )
             reset = resp == "y"
-
-        if prank_name == "Wallpaper":
+        # Handle Speech specially since it uses Prank interface
+        if prank_name == "Speech":
+            self.speech.setup()
+            self.speech.run(self.execute_remote, ip)
+            print(f"{prank_name} executed on {ip}.")
+            return
+        elif prank_name == "Wallpaper":
             if not reset:
                 wallpaper_path: str = self._validate_wallpaper_path()
-                prank_func(ip, reset=reset, path=wallpaper_path)  # pyright: ignore[reportCallIssue]
+                prank_func(ip, reset=reset, path=wallpaper_path)
             else:
-                prank_func(ip, reset=reset)  # pyright: ignore[reportCallIssue]
-        elif prank_name in ["send_fake_notifications", "Speech"]:
+                prank_func(ip, reset=reset)
+        elif prank_name == "send_fake_notifications":
             prank_func(ip)
         else:
-            prank_func(ip, reset=reset)  # pyright: ignore[reportCallIssue]
+            prank_func(ip, reset=reset)
 
         print(f"{prank_name} executed on {ip}.")
 
@@ -339,5 +348,6 @@ def main():
             return
 
 
-while True:
-    main()
+if __name__ == "__main__":
+    while True:
+        main()

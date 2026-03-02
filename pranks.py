@@ -135,7 +135,8 @@ class Speech(Prank):
 
     @override
     def run(self, executor: Callable[[str, str], None], ip: str) -> None:
-        executor(ip, f"spd-say {''.join(self.options)} '{self.message}'")
+        print(f"{' '.join(self.options)}")
+        executor(ip, f"spd-say {' '.join(self.options)} '{self.message}'")
 
     @override
     def reset(self, executor: Callable[[str, str], None], ip: str) -> None:

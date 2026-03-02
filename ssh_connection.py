@@ -7,9 +7,8 @@ class SSHConnection:
         self.timeout: int = timeout
         self.target: str = ""
 
-    def connect(self, ip: str) -> bool:
+    def connect(self, ip: str):
         self.target = f"{self.user}@{ip}"
-        return self.get_hostname() is not None
 
     def execute(self, cmd: str) -> str:
         result = subprocess.run(
@@ -36,9 +35,15 @@ class SSHConnection:
                 timeout=self.timeout + 1,
             )
             return result.stdout.strip()
-        except Exception as e:
-            print(e)
+        except Exception:
             return None
+
+    def scp(self, local_path: str, remote_path: str) -> None:
+        subprocess.run(
+            ["scp", local_path, f"{self.target}:{remote_path}"],
+            stderr=subprocess.DEVNULL,
+            timeout=self.timeout,
+        )
 
     def close(self) -> None:
         self.target = ""
