@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import threading
 from scanner import SSHScanner, pc_to_ip_mapping, validate_ipv4
 from ssh_connection import SSHConnection
 from pranks import Speech
@@ -190,6 +191,7 @@ class Jokes:
             self.target_pc = input("Write pc hostname : ")
             if self.target_pc in pc_to_ip_mapping:
                 return
+            print(f"Host '{self.target_pc}' not found. Available: {list(pc_to_ip_mapping.keys())}")
 
     def get_valid_prank_index(self) -> int:
         while True:
@@ -340,23 +342,21 @@ def main():
         case cmd if "run" in cmd:
             joke.run()
 
-        case cmd if "hosts" in cmd:
-            # scanner.print_hosts()
-            pass
-
-        case cmd if "status" in cmd:
-            # joke.status
-            # prints current target, prank
-            # for quick check
-            pass
-
         case cmd if "rsh" in cmd:
+            if not joke.target_pc:
+                print("No target selected. Use 'target' first.")
+                return
             my_ip: str = input("Your ip: ")
             rsh_connection = RSHConnection(my_ip)
+            listener_thread = threading.Thread(
+                target=rsh_connection.listen, daemon=True
+            )
+            listener_thread.start()
+            print(f"Listener started, deploying to {joke.target_pc}...")
             rsh_connection.deploy(joke.target_pc)
 
         case _:
-            print("Help: [scan|list|prank|target|run|hosts|status|rsh]")
+            print("Help: [scan|list|prank|target|run|rsh]")
             return
 
 
