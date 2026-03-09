@@ -3,6 +3,16 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable
 from typing import override
 
+def get_user_option(number_of_options: int) -> int:
+    while True:
+        try:
+            user_choice: int = int(input("> "))
+            if 1 <= user_choice <= number_of_options:
+                return user_choice
+            else:
+                raise ValueError
+        except ValueError:
+            print("Invalid option")
 
 class Prank(ABC):
     @abstractmethod
@@ -96,16 +106,6 @@ class Speech(Prank):
         print("6. Reset")
         print("7. Save and exit")
 
-    def get_user_option(self, number_of_options: int) -> int:
-        while True:
-            try:
-                user_choice: int = int(input("> "))
-                if 1 <= user_choice <= number_of_options:
-                    return user_choice
-                else:
-                    raise ValueError
-            except ValueError:
-                print("Invalid option")
 
     @override
     def setup(self) -> None:
@@ -113,7 +113,7 @@ class Speech(Prank):
         # NOTE: setup will call each function that doing some setup thing
         while True:
             self.show_options()
-            user_choice: int = self.get_user_option(7)
+            user_choice: int = get_user_option(7)
             match user_choice:
                 case 1:
                     self.set_message()
@@ -218,3 +218,145 @@ class Speech(Prank):
             except ValueError:
                 pass
             print("Invalid option")
+# NOTE:
+# ******************************************
+#      DVD - for opening a closing dvd tray
+# ******************************************
+class DVDTray(Prank):
+    def __init__(self) -> None:
+        self.action: str = "open" 
+        self.states: list[str] = ["open", "close"]
+    @override
+    def get_name(self) -> str:
+        return "DVD Tray"
+
+    @override
+    def can_reset(self) -> bool:
+        return True
+
+    @override
+    def setup(self) -> None:
+        print("=== DVD Tray prank ===")
+        print("1. Open tray")
+        print("2. Close tray")
+        choice: int = get_user_option(2)
+        self.action = self.states[choice] 
+
+    @override
+    def save(self) -> None:
+        pass
+
+    @override
+    def run(self, executor: Callable[[str, str], None], ip: str) -> None:
+        cmd = "eject" if self.action == "open" else "eject -t"
+        executor(ip, cmd)
+
+    @override
+    def reset(self, executor: Callable[[str, str], None], ip: str) -> None:
+        cmd = "eject -t" if self.action == "open" else "eject"
+        executor(ip, cmd)
+# NOTE:
+# ******************************************
+#    Rotate Sceen
+# ******************************************
+class RotateScreen(Prank):
+    def __init__(self) -> None:
+        self.rotation: str = "left"
+
+    @override
+    def get_name(self) -> str:
+        return "Rotate Screen"
+
+    @override
+    def can_reset(self) -> bool:
+        return True
+
+    @override
+    def setup(self) -> None:
+        print("=== Rotate Screen prank ===")
+        print("1. Rotate left")
+        print("2. Rotate right")
+        print("3. Inverted")
+        choice = input("> ")
+        rotations = ["left", "right", "inverted"]
+        self.rotation = rotations[int(choice) - 1] if choice in "123" else "left"
+
+    @override
+    def save(self) -> None:
+        pass
+
+    @override
+    def run(self, executor: Callable[[str, str], None], ip: str) -> None:
+        cmd = f"xrandr --output DP-1 --rotate {self.rotation}"
+        executor(ip, cmd)
+
+    @override
+    def reset(self, executor: Callable[[str, str], None], ip: str) -> None:
+        executor(ip, "xrandr --output DP-1 --rotate normal")
+
+
+class CursorTheme(Prank):
+    def __init__(self) -> None:
+        self.theme: str = "Adwaita"
+
+    @override
+    def get_name(self) -> str:
+        return "Cursor Theme"
+
+    @override
+    def can_reset(self) -> bool:
+        return True
+
+    @override
+    def setup(self) -> None:
+        print("=== Cursor Theme prank ===")
+        self.theme = input("Enter cursor theme name: ") or "Adwaita"
+
+    @override
+    def save(self) -> None:
+        pass
+
+    @override
+    def run(self, executor: Callable[[str, str], None], ip: str) -> None:
+        executor(ip, f'gsettings set org.gnome.desktop.interface cursor-theme "{self.theme}"')
+
+    @override
+    def reset(self, executor: Callable[[str, str], None], ip: str) -> None:
+        executor(ip, "gsettings reset org.gnome.desktop.interface cursor-theme")
+
+
+class MinimumWindowSize(Prank):
+    def __init__(self) -> None:
+        self.width: int = 800
+        self.height: int = 600
+
+    @override
+    def get_name(self) -> str:
+        return "Minimum Window Size"
+
+    @override
+    def can_reset(self) -> bool:
+        return True
+
+    @override
+    def setup(self) -> None:
+        print("=== Minimum Window Size prank ===")
+        self.width = int(input("Width (default 800): ") or 800)
+        self.height = int(input("Height (default 600): ") or 600)
+
+    @override
+    def save(self) -> None:
+        pass
+
+    @override
+    def run(self, executor: Callable[[str, str], None], ip: str) -> None:
+        executor(ip, f"gsettings set org.gnome.mutter minimum-window-width {self.width}")
+        executor(ip, f"gsettings set org.gnome.mutter minimum-window-height {self.height}")
+
+    @override
+    def reset(self, executor: Callable[[str, str], None], ip: str) -> None:
+        executor(ip, "gsettings reset org.gnome.mutter minimum-window-width")
+        executor(ip, "gsettings reset org.gnome.mutter minimum-window-height")
+
+
+# TODO: class for making function dleayed
