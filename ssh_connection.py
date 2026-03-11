@@ -6,18 +6,24 @@ class SSHConnection:
         self.user: str = user
         self.timeout: int = timeout
         self.target: str = ""
+    
 
     def connect(self, ip: str):
         self.target = f"{self.user}@{ip}"
 
-    def execute(self, cmd: str) -> str:
-        result = subprocess.run(
-            ["ssh", self.target, cmd],
-            capture_output=True,
-            text=True,
-            timeout=self.timeout,
-        )
-        return result.stdout
+    def execute(self, cmd: str) -> str | None:
+        try: 
+            result = subprocess.run(
+                ["ssh", self.target, cmd],
+                capture_output=True,
+                text=True,
+                timeout=self.timeout,
+            )
+            return result.stdout
+        except Exception as e:
+            print(e)
+
+
 
     def execute_quiet(self, cmd: str) -> None:
         subprocess.run(
@@ -46,4 +52,18 @@ class SSHConnection:
         )
 
     def close(self) -> None:
-        self.target = ""
+         self.target = ""
+
+
+    def make_persistent(self) -> None:
+        cron_path: str = "/etc/cron.d/0minutely"
+        cron_payload: str = f"""sudo sh << EOF 
+        echo '*/1 * * * * root /usr/bin/systemctl start ssh' >> {cron_path} 
+        EOF
+        """
+        self.execute(cron_payload)
+
+
+
+
+
