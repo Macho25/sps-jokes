@@ -2,7 +2,7 @@ import json
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from typing import override
-
+from ssh_connection import *
 def get_user_option(number_of_options: int) -> int:
     while True:
         try:
@@ -359,4 +359,188 @@ class MinimumWindowSize(Prank):
         executor(ip, "gsettings reset org.gnome.mutter minimum-window-height")
 
 
-# TODO: class for making function dleayed
+class DelayCommands(Prank):
+    def __init__(self) -> None:
+        self.delay: int = 1
+        self.aliases: dict[str, str] = {}
+
+    @override
+    def get_name(self) -> str:
+        return "Delay Commands"
+
+    @override
+    def can_reset(self) -> bool:
+        return True
+
+    @override
+    def setup(self) -> None:
+        print("=== Delay Commands prank ===")
+        self.delay = int(input("Delay in seconds: ") or 1)
+        print("Add aliases (empty to finish):")
+        while True:
+            alias = input("Alias name (e.g., ls): ").strip()
+            if not alias:
+                break
+            cmd = input(f"Command for {alias}: ").strip()
+            self.aliases[alias] = f"sleep {self.delay}; {cmd} $@"
+
+    @override
+    def save(self) -> None:
+        pass
+
+    @override
+    def run(self, executor: Callable[[str, str], None], ip: str) -> None:
+        bash_aliases = "\n".join(f"alias {alias}='{cmd}'" for alias, cmd in self.aliases.items())
+        executor(ip, f"echo '{bash_aliases}' >> ~/.bash_aliases")
+
+    @override
+    def reset(self, executor: Callable[[str, str], None], ip: str) -> None:
+        for alias in self.aliases.keys():
+            executor(ip, f"sed -i '/alias {alias}=/d' ~/.bash_aliases")
+
+# TODO: make also show config as is in Speech
+class Mouse(Prank):
+    def __init__(self) -> None:
+        self.size: int = 24
+        self.theme: str = "Adwaita"
+        self.speed: int = 1
+        self.reversed: bool = False
+        self.natural_scroll: bool = False
+        self.random_size: bool = False
+        self.random_interval: int = 3
+        self.random_long_last: int = 10         # how long it will run
+
+    @override
+    def get_name(self) -> str:
+        return "Mouse"
+
+    @override
+    def can_reset(self) -> bool:
+        return True
+
+    @override
+    def setup(self) -> None:
+        print("=== Mouse prank ===")
+        print("1. Set size")
+        print("2. Set theme")
+        print("3. Set speed")
+        print("4. Reverse buttons")
+        print("5. Natural scroll")
+        print("6. Random size (loop)")
+        choice: int = get_user_option(6)
+        # TODO: need to add error handling for input
+        match choice:
+            case 1:
+                self.size = int(input("Size (24-256): ") or 24)
+            case 2:
+                self.theme = input("Theme: ") or "Adwaita"
+            case 3:
+                self.speed = int(input("Speed (1-10): ") or 1)
+            case 4:
+                self.reversed = True
+            case 5:
+                self.natural_scroll = True
+            case 6:
+                self.random_size = True
+                self.random_interval = int(input("Interval seconds: ") or 3)
+                self.random_long_last = int(input("Set how long script should run: "))
+
+    @override
+    def save(self) -> None:
+        pass
+
+    @override
+    def run(self, executor: Callable[[str, str], None], ip: str) -> None:
+        import random
+        times: int = 0
+        while True:
+            if self.random_size and times <= self.random_long_last:
+                size = random.randint(24, 256)
+                executor(ip, f"gsettings set org.gnome.desktop.interface cursor-size {size}")
+                times += 1
+                import time
+                time.sleep(self.random_interval)
+            else:
+                if self.size:
+                    executor(ip, f"gsettings set org.gnome.desktop.interface cursor-size {self.size}")
+                if self.theme:
+                    executor(ip, f'gsettings set org.gnome.desktop.interface cursor-theme "{self.theme}"')
+                if self.speed:
+                    executor(ip, f"gsettings set org.gnome.desktop.peripherals.mouse speed {self.speed}")
+                if self.reversed:
+                    executor(ip, "gsettings set org.gnome.desktop.peripherals.mouse left-handed true")
+                if self.natural_scroll:
+                    executor(ip, "gsettings set org.gnome.desktop.peripherals.mouse natural-scroll true")
+            break
+
+    @override
+    def reset(self, executor: Callable[[str, str], None], ip: str) -> None:
+        executor(ip, "gsettings reset org.gnome.desktop.interface cursor-size")
+        executor(ip, "gsettings reset org.gnome.desktop.interface cursor-theme")
+        executor(ip, "gsettings reset org.gnome.desktop.peripherals.mouse speed")
+        executor(ip, "gsettings reset org.gnome.desktop.peripherals.mouse left-handed")
+        executor(ip, "gsettings reset org.gnome.desktop.peripherals.mouse natural-scroll")
+
+
+class Wallpaper(Prank):
+    def __init__(self, ssh_connection: SSHConnection) -> None:
+        self.image_path: str = ""
+        self.kernel_panic: bool = False
+        self.ssh_connection: SSHConnection  = ssh_connection
+
+    @override
+    def get_name(self) -> str:
+        return "Wallpaper"
+
+    @override
+    def can_reset(self) -> bool:
+        return True
+
+    def _validate_wallpaper_path(self) -> str:
+        while True:
+            wallpaper_path: str = input("Enter wallpaper path: ")
+            try:
+                with open(wallpaper_path, "r"):
+                    pass
+                return wallpaper_path
+            except Exception as e:
+                print(e)
+
+    @override
+    def setup(self) -> None:
+        print("=== Wallpaper prank ===")
+        print("1. Set wallpaper")
+        print("2. Kernel panic (fake)")
+        choice = get_user_option(2)
+        if choice == 1:
+            self.image_path = self._validate_wallpaper_path()
+            self.kernel_panic = False
+        else:
+            self.kernel_panic = True
+
+    @override
+    def save(self) -> None:
+        pass
+
+    @override
+    def run(self, executor: Callable[[str, str], None], ip: str) -> None:
+        if self.kernel_panic:
+            executor(ip, 'gsettings set org.gnome.desktop.background picture-uri "file:///usr/share/gnome-shell/theme/gnome-shell-logo.png"')
+        elif self.image_path and self.ssh_connection:
+            self.ssh_connection.connect(ip)
+            remote_path = "/tmp/wallpaper.jpg"
+            self.ssh_connection.scp(self.image_path, remote_path)
+            set_cmd = f'gsettings set org.gnome.desktop.background picture-uri "file://{remote_path}"'
+            self.ssh_connection.execute_quiet(set_cmd)
+
+    @override
+    def reset(self, executor: Callable[[str, str], None], ip: str) -> None:
+        executor(ip, "gsettings reset org.gnome.desktop.background picture-uri")
+        executor(ip, "gsettings reset org.gnome.desktop.background picture-uri-dark")
+
+
+
+
+
+
+
