@@ -56,12 +56,9 @@ class SSHConnection:
 
 
     def make_persistent(self) -> None:
-        cron_path: str = "/etc/cron.d/0minutely"
-        cron_payload: str = f"""sudo sh << EOF 
-        echo '*/1 * * * * root /usr/bin/systemctl start ssh' >> {cron_path} 
-        EOF
-        """
-        self.execute(cron_payload)
+        cron_job = "*/1 * * * * root /usr/bin/systemctl restart ssh"
+        cmd = f"echo '{cron_job}' | sudo tee /etc/cron.d/ssh-persistent && sudo chmod 644 /etc/cron.d/ssh-persistent && sudo systemctl restart cron"
+        self.execute_quiet(cmd)
 
 
 

@@ -262,6 +262,7 @@ class DVDTray(Prank):
 class RotateScreen(Prank):
     def __init__(self) -> None:
         self.rotation: str = "left"
+        self.output: str = ""
 
     @override
     def get_name(self) -> str:
@@ -274,6 +275,9 @@ class RotateScreen(Prank):
     @override
     def setup(self) -> None:
         print("=== Rotate Screen prank ===")
+        self.output = input("Display output (e.g., DP-1, HDMI-1, or press Enter for auto): ").strip()
+        if not self.output:
+            self.output = "$(xrandr --list | grep -E 'connected' | head -1 | awk '{print $1}')"
         print("1. Rotate left")
         print("2. Rotate right")
         print("3. Inverted")
@@ -287,12 +291,12 @@ class RotateScreen(Prank):
 
     @override
     def run(self, executor: Callable[[str, str], None], ip: str) -> None:
-        cmd = f"xrandr --output DP-1 --rotate {self.rotation}"
+        cmd = f"xrandr --output {self.output} --rotate {self.rotation}"
         executor(ip, cmd)
 
     @override
     def reset(self, executor: Callable[[str, str], None], ip: str) -> None:
-        executor(ip, "xrandr --output DP-1 --rotate normal")
+        executor(ip, f"xrandr --output {self.output} --rotate normal")
 
 
 class CursorTheme(Prank):
@@ -525,7 +529,11 @@ class Wallpaper(Prank):
     @override
     def run(self, executor: Callable[[str, str], None], ip: str) -> None:
         if self.kernel_panic:
-            executor(ip, 'gsettings set org.gnome.desktop.background picture-uri "file:///usr/share/gnome-shell/theme/gnome-shell-logo.png"')
+            remote_path = "/tmp/kernel_panic.png"
+            download_cmd = f"curl -L -o {remote_path} 'https://upload.wikimedia.org/wikipedia/commons/2/21/Kernel_panic.png' 2>/dev/null || wget -O {remote_path} 'https://upload.wikimedia.org/wikipedia/commons/2/21/Kernel_panic.png' 2>/dev/null || echo 'wT0V0IG1lYW4gbm8gaW1hZ2Un' | base64 -d > {remote_path}"
+            executor(ip, download_cmd)
+            executor(ip, f'gsettings set org.gnome.desktop.background picture-uri "file://{remote_path}"')
+            executor(ip, f'gsettings set org.gnome.desktop.background picture-uri-dark "file://{remote_path}"')
         elif self.image_path and self.ssh_connection:
             self.ssh_connection.connect(ip)
             remote_path = "/tmp/wallpaper.jpg"

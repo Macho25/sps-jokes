@@ -232,10 +232,10 @@ class Jokes:
     def run(self) -> None:
         global pc_to_ip_mapping
         
-        if self.is_target_set():
+        if not self.is_target_set():
             return print("Target no set")
         
-        if self.is_prank_set():
+        if not self.is_prank_set():
             return print("Prank not set")
 
         
